@@ -1,0 +1,512 @@
+---
+title: "export_municipios_farmacias"
+author: "Rodrigo Hernandez"
+date: "2024-09-28"
+output: html_document
+---
+```{r}
+# Get rid of scientific notation
+options(scipen = 99999999)
+
+# Load the packages to be used
+# First check is "pacman"is already installed and installs it otherwise
+if (!require("pacman")) {
+  install.packages("pacman")
+}
+
+#Installing and loading the packages needed
+pacman::p_load(readr, dplyr, ggplot2, stringr, sf, RColorBrewer)
+#Intalling janitor
+install.packages("janitor")
+library(janitor)
+
+
+```
+
+```{r}
+farmacias_total_denue = read_csv("../../dataton2024_src/denue_00_46321-46531_csv/conjunto_de_datos/denue_inegi_46321-46531_.csv")|>
+  mutate(nombre_act = str_to_lower(nombre_act))|>
+  filter(str_detect(nombre_act, "farm"))
+```
+```{r}
+#municipios 
+Sys.setenv(OGR_GEOMETRY_ACCEPT_UNCLOSED_RING = "NO")
+municipios = st_read("../../dataton2024_src/cartografia/MUNICIPIO.shp")
+municipios <- st_transform(municipios, crs = 4326)
+
+```
+
+```{r}
+frontera_iztapalapa = municipios |>
+filter(ENTIDAD == 09, MUNICIPIO == 07)
+print(filter(municipios, ENTIDAD == 09, MUNICIPIO == 07))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_iztapalapa,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+iztapalapa_farmacias = farmacias_total_denue |>
+filter(cve_ent == "09", cve_mun == "007")
+print(filter(farmacias_total_denue,cve_ent == "09", cve_mun == "007"))
+```
+
+```{r}
+iztapalapa_farmacias_sf <- st_as_sf(iztapalapa_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_iztapalapa = st_transform(iztapalapa_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_iztapalapa, fill = "white", color = "grey80")+
+geom_sf(data = lambert_iztapalapa, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 9, municipio == 7)
+```
+EXPORTACION
+```{r}
+st_write(lambert_iztapalapa, "../../exports/lambert_iztapalapa.shp")
+#exportar frontera iztapalapa
+st_write(frontera_iztapalapa, "../../exports/frontera_iztapalapa.shp")
+```
+
+#Ecatzingo
+
+```{r}
+frontera_ecatzingo = municipios |>
+filter(ENTIDAD == 15, MUNICIPIO == 35)
+print(filter(municipios, ENTIDAD == 15, MUNICIPIO == 35))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_ecatzingo,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, municipio == 'Ecatzingo'))
+
+ecatzingo_farmacias = farmacias_total_denue |>
+filter(cve_ent == "15", cve_mun == "034")
+print(filter(farmacias_total_denue,cve_ent == "15", cve_mun == "034"))
+```
+
+```{r}
+ecatzingo_farmacias_sf <- st_as_sf(ecatzingo_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_ecatzingo = st_transform(ecatzingo_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_ecatzingo, fill = "white", color = "grey80")+
+geom_sf(data = lambert_ecatzingo, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 15, municipio == 035)
+```
+EXPORTACION
+```{r}
+st_write(lambert_ecatzingo, "../../exports/lambert_ecatzingo.shp")
+#exportar frontera iztapalapa
+st_write(frontera_ecatzingo, "../../exports/frontera_ecatzingo.shp")
+```
+#Quecholac
+
+```{r}
+frontera_quecholac = municipios |>
+filter(ENTIDAD == 21, MUNICIPIO == 116)
+print(filter(municipios, ENTIDAD == 21, MUNICIPIO == 116))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_quecholac,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, municipio == 'Quecholac'))
+
+quecholac_farmacias = farmacias_total_denue |>
+filter(cve_ent == "21", cve_mun == "115")
+print(filter(farmacias_total_denue,cve_ent == "21", cve_mun == "115"))
+```
+
+```{r}
+quecholac_farmacias_sf <- st_as_sf(quecholac_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_quecholac = st_transform(quecholac_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_quecholac, fill = "white", color = "grey80")+
+geom_sf(data = lambert_quecholac, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 21, municipio == 116)
+```
+EXPORTACION
+```{r}
+st_write(lambert_quecholac, "../../exports/quecholac/lambert_quecholac.shp")
+#exportar frontera iztapalapa
+st_write(frontera_quecholac, "../../exports/quecholac/frontera_quecholac.shp")
+```
+#Nicolás Romero 
+
+```{r}
+frontera_nicolas_romero = municipios |>
+filter(ENTIDAD == 15, MUNICIPIO == 61)
+print(filter(municipios, ENTIDAD == 15, MUNICIPIO == 61))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_nicolas_romero,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "15", cve_mun == "060"))
+
+nicolas_romero_farmacias = farmacias_total_denue |>
+filter(cve_ent == "15", cve_mun == "060")
+print(nicolas_romero_farmacias)
+```
+
+```{r}
+
+nicolas_romero_farmacias_sf <- st_as_sf(nicolas_romero_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_nicolas_romero = st_transform(nicolas_romero_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_nicolas_romero, fill = "white", color = "grey80")+
+geom_sf(data = lambert_nicolas_romero, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 15, municipio == 61)
+```
+EXPORTACION
+```{r}
+st_write(lambert_nicolas_romero, "../../exports/Nicolás Romero/lambert_nicolas_romero.shp")
+#exportar frontera iztapalapa
+st_write(frontera_nicolas_romero, "../../exports/Nicolás Romero/frontera_nicolas_romero.shp")
+```
+#Morelos  
+
+```{r}
+frontera_morelos = municipios |>
+filter(ENTIDAD == 16, MUNICIPIO == 55)
+print(filter(municipios, ENTIDAD == 16, MUNICIPIO == 55))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "16", cve_mun == "054"))
+
+morelos_farmacias = farmacias_total_denue |>
+filter(cve_ent == "16", cve_mun == "054")
+print(morelos_farmacias)
+```
+
+```{r}
+
+morelos_farmacias_sf <- st_as_sf(morelos_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_morelos = st_transform(morelos_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos, fill = "white", color = "grey80")+
+geom_sf(data = lambert_morelos, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 16, municipio == 55)
+```
+EXPORTACION
+```{r}
+st_write(lambert_morelos, "../../exports/Morelos/lambert_morelos.shp")
+#exportar frontera iztapalapa
+st_write(frontera_morelos, "../../exports/Morelos/frontera_morelos.shp")
+```
+#Morelos  
+
+```{r}
+frontera_morelos = municipios |>
+filter(ENTIDAD == 16, MUNICIPIO == 55)
+print(filter(municipios, ENTIDAD == 16, MUNICIPIO == 55))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "16", cve_mun == "054"))
+
+morelos_farmacias = farmacias_total_denue |>
+filter(cve_ent == "16", cve_mun == "054")
+print(morelos_farmacias)
+```
+
+```{r}
+
+morelos_farmacias_sf <- st_as_sf(morelos_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_morelos = st_transform(morelos_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos, fill = "white", color = "grey80")+
+geom_sf(data = lambert_morelos, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+```{r}
+filter(farm_municipios, entidad == 16, municipio == 55)
+```
+EXPORTACION
+```{r}
+st_write(lambert_morelos, "../../exports/Morelos/lambert_morelos.shp")
+#exportar frontera iztapalapa
+st_write(frontera_morelos, "../../exports/Morelos/frontera_morelos.shp")
+```
+
+#Donato Guerra, Tlataya y Tonatico
+municipality table for remaining municipalities from Donato Guerra to Leon 
+
+First manual job: find the municipalities in "municipios" and in denue. Fill in their entidad, municipio and cve_ent, cve_mun respectively. 
+```{r}
+municipality_table_1 <- data.frame(
+  ENTIDAD = c(15, 15, 15),
+  MUNICIPIO = c(33, 108, 106),
+  cve_ent = c("15", "15", "15"),
+  cve_mun = c("032", "107", "105"),
+  name = c("Donato Guerra", "Tonatico", "Tlatlaya")
+)
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "19", cve_mun == "039"))
+```
+
+```{r}
+# Loop through the table and run the code for each municipality
+for (i in 1:nrow(municipality_table_1)) {
+  
+  # Extract data for the current municipality
+  entidad <- municipality_table_1$ENTIDAD[i]
+  municipio <- municipality_table_1$MUNICIPIO[i]
+  ent_code <- municipality_table_1$cve_ent[i]
+  mun_code <- municipality_table_1$cve_mun[i]
+  name <- municipality_table_1$name[i]
+  
+  # Filter for the selected municipality
+  frontera_municipio <- municipios |>
+    filter(ENTIDAD == entidad, MUNICIPIO == municipio)
+  
+  # Plot the municipality boundary
+  ggplot() +
+    geom_sf(data = frontera_municipio, color = "grey", fill = "white", size = 0.1) +
+    theme_minimal()
+  
+  # Filter drug stores in the municipality
+  print(filter(farmacias_total_denue, cve_ent == cve_ent, cve_mun == mun_code))
+  
+  municipio_farmacias <- farmacias_total_denue |>
+    filter(cve_ent == ent_code, cve_mun == mun_code)
+  print(municipio_farmacias)
+  
+  # Convert to spatial data
+  municipio_farmacias_sf <- st_as_sf(municipio_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+  
+  # Transform coordinates
+  lambert_municipio <- st_transform(municipio_farmacias_sf, crs = 4326)
+  
+  # Plot the municipality with drug store locations
+  ggplot() +
+    geom_sf(data = frontera_municipio, fill = "white", color = "grey80") +
+    geom_sf(data = lambert_municipio, color = "blue", alpha = 1, size = 1) +
+    theme_minimal()
+  
+  # Test number of drug stores by municipality
+  filter(farm_municipios, entidad == entidad, municipio == municipio)
+  
+  # Export the spatial data
+  st_write(lambert_municipio, paste0("../../exports/", name, "/lambert_", name, ".shp"))
+  st_write(frontera_municipio, paste0("../../exports/", name, "/frontera_", name, ".shp"))
+  
+}
+```
+```{r}
+  ggplot() +
+    geom_sf(data = lambert_donato, fill = "white", color = "grey80") +
+    geom_sf(data = lambert_municipio, color = "blue", alpha = 1, size = 1) +
+    theme_minimal()
+```
+#Ixtapan de la Sal   
+
+```{r}
+frontera_ixtapan = municipios |>
+filter(ENTIDAD == 15, MUNICIPIO == 41)
+print(filter(municipios, ENTIDAD == 15, MUNICIPIO == 41))
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos,
+color = "grey",
+fill = "white",
+size = 0.1)+
+theme_minimal()
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "15", cve_mun == "040"))
+
+morelos_farmacias = farmacias_total_denue |>
+filter(cve_ent == "15", cve_mun == "040")
+print(morelos_farmacias)
+```
+
+```{r}
+
+morelos_farmacias_sf <- st_as_sf(morelos_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+
+lambert_morelos = st_transform(morelos_farmacias_sf, crs = 4326)
+
+```
+
+```{r}
+ggplot()+
+geom_sf(data = frontera_morelos, fill = "white", color = "grey80")+
+geom_sf(data = lambert_morelos, color = "blue", alpha = 1, size = 1)+
+theme_minimal()
+```
+
+Prueba cuenta de farm por muni: 
+
+
+```{r}
+municipality_table_2 <- data.frame(
+  ENTIDAD = c(15, 15, 15, 15, 26, 7, 9, 23, 11, 13),
+  MUNICIPIO = c(41, 111, 83, 62, 67, 101, 5, 2, 20, 46),
+  cve_ent = c("15", "15", "15", "15", "26", "07", "09", "23", "11", "13"),
+  cve_mun = c("040", "110", "082", "061", "049", "102", "005", "001", "020", "047"),
+  name = c("ixtapan_de_la_sal", "Valle de Bravo", "Tejupilco", "Nopaltepec", "Quiriego", "Tuxla_chico", "gustavo_madero", "Cozumel", "Leon", "pacula")
+)
+```
+
+```{r}
+print(filter(farmacias_total_denue, cve_ent == "13", cve_mun == "047"))
+```
+
+```{r}
+# Loop through the table and run the code for each municipality
+for (i in 1:nrow(municipality_table_2)) {
+  
+  # Extract data for the current municipality
+  entidad <- municipality_table_2$ENTIDAD[i]
+  municipio <- municipality_table_2$MUNICIPIO[i]
+  ent_code <- municipality_table_2$cve_ent[i]
+  mun_code <- municipality_table_2$cve_mun[i]
+  name <- municipality_table_2$name[i]
+  
+  # Filter for the selected municipality
+  frontera_municipio <- municipios |>
+    filter(ENTIDAD == entidad, MUNICIPIO == municipio)
+  
+  # Plot the municipality boundary
+  ggplot() +
+    geom_sf(data = frontera_municipio, color = "grey", fill = "white", size = 0.1) +
+    theme_minimal()
+  
+  # Filter drug stores in the municipality
+  print(filter(farmacias_total_denue, cve_ent == cve_ent, cve_mun == mun_code))
+  
+  municipio_farmacias <- farmacias_total_denue |>
+    filter(cve_ent == ent_code, cve_mun == mun_code)
+  print(municipio_farmacias)
+  
+  # Convert to spatial data
+  municipio_farmacias_sf <- st_as_sf(municipio_farmacias, coords = c("longitud", "latitud"), crs = 4326)
+  
+  # Transform coordinates
+  lambert_municipio <- st_transform(municipio_farmacias_sf, crs = 4326)
+  
+  # Plot the municipality with drug store locations
+  ggplot() +
+    geom_sf(data = frontera_municipio, fill = "white", color = "grey80") +
+    geom_sf(data = lambert_municipio, color = "blue", alpha = 1, size = 1) +
+    theme_minimal()
+  
+  # Test number of drug stores by municipality
+  filter(farm_municipios, entidad == entidad, municipio == municipio)
+  
+  # Export the spatial data
+  st_write(lambert_municipio, paste0("../../exports/", name, "/lambert_", name, ".shp"))
+  st_write(frontera_municipio, paste0("../../exports/", name, "/frontera_", name, ".shp"))
+  
+}
+```
+```
+
