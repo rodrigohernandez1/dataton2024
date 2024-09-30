@@ -1,0 +1,1840 @@
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/frontera_iztapalapa.shp")
+farmacias_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/lambert_iztapalapa.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_iztapalapa) != st_crs(farmacias_iztapalapa)) {
+  farmacias_iztapalapa <- st_transform(farmacias_iztapalapa, st_crs(frontera_iztapalapa))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_iztapalapa, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_iztapalapa, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Iztapalapa y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("iztapalapa_frontera_farmacias.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/lambert_iztapalapa.shp")
+frontera_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/frontera_iztapalapa.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_iztapalapa <- st_coordinates(farmacias_iztapalapa)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_iztapalapa <- as.data.frame(coords_farmacias_iztapalapa)
+colnames(df_farmacias_iztapalapa) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_iztapalapa <- deldir(df_farmacias_iztapalapa$longitud, df_farmacias_iztapalapa$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_iztapalapa <- voronoi_result_iztapalapa$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_iztapalapa <- as.data.frame(segments_iztapalapa)
+colnames(df_segments_iztapalapa) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_iztapalapa, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_iztapalapa, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_iztapalapa, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Iztapalapa") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("iztapalapa_frontera_farmacias.png", width = 10, height = 8)
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/frontera_iztapalapa.shp")
+lambert_iztapalapa <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Iztapalapa/lambert_iztapalapa.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_iztapalapa <- st_coordinates(lambert_iztapalapa)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_iztapalapa <- deldir(coords_farmacias_iztapalapa[,1], coords_farmacias_iztapalapa[,2])
+vertices_iztapalapa <- data.frame(voronoi_result_iztapalapa$dirsgs)
+names(vertices_iztapalapa) <- c("x1", "y1", "id1", "id2")
+vertices_sf_iztapalapa <- st_as_sf(vertices_iztapalapa[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_iztapalapa))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_iztapalapa), 1, function(v) {
+  min(sqrt((coords_farmacias_iztapalapa[,1] - v[1])^2 + (coords_farmacias_iztapalapa[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_iztapalapa$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_iztapalapa_df <- as.data.frame(st_coordinates(vertices_sf_iztapalapa))
+vertices_iztapalapa_df$distance <- vertices_sf_iztapalapa$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_iztapalapa_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_iztapalapa, fill = NA, color = "black") +
+  geom_point(data = vertices_iztapalapa_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("iztapalapa_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_iztapalapa <- vertices_sf_iztapalapa[st_within(vertices_sf_iztapalapa, frontera_iztapalapa, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_iztapalapa) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_iztapalapa <- apply(st_coordinates(vertices_filtered_iztapalapa), 1, function(v) {
+    min(sqrt((coords_farmacias_iztapalapa[,1] - v[1])^2 + (coords_farmacias_iztapalapa[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_iztapalapa$distance <- distances_filtered_iztapalapa
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_iztapalapa_df <- as.data.frame(st_coordinates(vertices_filtered_iztapalapa))
+  vertices_filtered_iztapalapa_df$distance <- vertices_filtered_iztapalapa$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_iztapalapa_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_iztapalapa, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_iztapalapa_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_50_iztapalapa <- vertices_filtered_iztapalapa_df[order(-vertices_filtered_iztapalapa_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_iztapalapa <- vertices_top_30_iztapalapa[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_iztapalapa)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_iztapalapa, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_iztapalapa, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/frontera_ecatzingo.shp")
+farmacias_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/lambert_ecatzingo.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_ecatzingo) != st_crs(farmacias_ecatzingo)) {
+  farmacias_ecatzingo <- st_transform(farmacias_ecatzingo, st_crs(frontera_ecatzingo))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_ecatzingo, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_ecatzingo, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Ecatzingo y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("ecatzingo_frontera_farmacias.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/lambert_ecatzingo.shp")
+frontera_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/frontera_ecatzingo.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_ecatzingo <- st_coordinates(farmacias_ecatzingo)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_ecatzingo <- as.data.frame(coords_farmacias_ecatzingo)
+colnames(df_farmacias_ecatzingo) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_ecatzingo <- deldir(df_farmacias_ecatzingo$longitud, df_farmacias_ecatzingo$latitud)
+
+# Extraer los segmentos del Voronoi
+segments <- voronoi_result_ecatzingo$dirsgs
+
+# Convertir los segmentos a un dataframe
+df_segments_ecatzingo <- as.data.frame(segments)
+colnames(df_segments_ecatzingo) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_ecatzingo, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_ecatzingo, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_ecatzingo, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Ecatzingo") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("ecatzingo_voronoi.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/frontera_ecatzingo.shp")
+farmacias_ecatzingo <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Ecatzingo/lambert_ecatzingo.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_ecatzingo <- st_coordinates(farmacias_ecatzingo)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_ecatzingo <- deldir(coords_farmacias_ecatzingo[,1], coords_farmacias_ecatzingo[,2])
+
+# Extraer los vértices de Voronoi
+vertices_ecatzingo <- data.frame(voronoi_result_ecatzingo$dirsgs)
+names(vertices) <- c("x1", "y1", "id1", "id2")
+
+# Convertir a objeto sf
+vertices_sf_ecatzingo <- st_as_sf(vertices_ecatzingo[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_ecatzingo))
+
+# Filtrar los vértices dentro de la frontera
+vertices_sf_ecatzingo <- vertices_sf_ecatzingo[st_within(vertices_sf_ecatzingo, st_geometry(frontera_ecatzingo), sparse = FALSE),]
+
+# Calcular distancias desde los vértices a los puntos de farmacias
+if (nrow(vertices_sf_ecatzingo) > 0) {
+  distances <- apply(st_coordinates(vertices_sf_ecatzingo), 1, function(v) {
+    min(sqrt((coords_farmacias_ecatzingo[,1] - v[1])^2 + (coords_farmacias_ecatzingo[,2] - v[2])^2))
+  })
+  
+  # Agregar distancias a los vértices
+  vertices_sf_ecatzingo$distance <- distances
+
+  # Graficar el mapa de calor basado en la distancia
+  ggplot() +
+    geom_sf(data = frontera_ecatzingo, fill = NA, color = "black") +
+    geom_point(data = as.data.frame(st_coordinates(vertices_sf_ecatzingo)), 
+               aes(x = X, y = Y, color = vertices_sf_ecatzingo$distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No se encontraron vértices dentro de la frontera.")
+}
+
+# (Opcional) Guardar la visualización
+ggsave("ecatzingo_voronoi_heatmap.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles
+frontera_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/frontera_nicolas_romero.shp")
+farmacias_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/lambert_nicolas_romero.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_nicolas_romero) != st_crs(farmacias_nicolas_romero)) {
+  farmacias_nicolas_romero <- st_transform(farmacias_nicolas_romero, st_crs(frontera_nicolas_romero))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_nicolas_romero, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_nicolas_romero, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Nicolás Romero y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nicolas_romero_frontera_farmacias.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/lambert_nicolas_romero.shp")
+frontera_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/frontera_nicolas_romero.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_nicolas_romero <- st_coordinates(farmacias_nicolas_romero)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_nicolas_romero <- as.data.frame(coords_farmacias_nicolas_romero)
+colnames(df_farmacias_nicolas_romero) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_nicolas_romero <- deldir(df_farmacias_nicolas_romero$longitud, df_farmacias_nicolas_romero$latitud)
+
+# Extraer los segmentos del Voronoi
+segments <- voronoi_result_nicolas_romero$dirsgs
+
+# Convertir los segmentos a un dataframe
+df_segments_nicolas_romero <- as.data.frame(segments)
+colnames(df_segments_nicolas_romero) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_nicolas_romero, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_nicolas_romero, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_nicolas_romero, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Nicolás Romero") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nicolas_romero_voronoi.png", width = 10, height = 8)
+```
+
+
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/frontera_nicolas_romero.shp")
+lambert_nicolas_romero <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nicolas Romero/lambert_nicolas_romero.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_nicolas_romero <- st_coordinates(lambert_nicolas_romero)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_nicolas_romero <- deldir(coords_farmacias_nicolas_romero[,1], coords_farmacias_nicolas_romero[,2])
+vertices_nicolas_romero <- data.frame(voronoi_result_nicolas_romero$dirsgs)
+names(vertices_nicolas_romero) <- c("x1", "y1", "id1", "id2")
+vertices_sf_nicolas_romero <- st_as_sf(vertices_nicolas_romero[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_nicolas_romero))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_nicolas_romero), 1, function(v) {
+  min(sqrt((coords_farmacias_nicolas_romero[,1] - v[1])^2 + (coords_farmacias_nicolas_romero[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_nicolas_romero$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_nicolas_romero_df <- as.data.frame(st_coordinates(vertices_sf_nicolas_romero))
+vertices_nicolas_romero_df$distance <- vertices_sf_nicolas_romero$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_nicolas_romero_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_nicolas_romero, fill = NA, color = "black") +
+  geom_point(data = vertices_nicolas_romero_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nicolas_romero_frontera_farmacias.png", width = 10, height = 8)
+```
+
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_nicolas_romero <- vertices_sf_nicolas_romero[st_within(vertices_sf_nicolas_romero, frontera_nicolas_romero, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_nicolas_romero) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_nicolas_romero <- apply(st_coordinates(vertices_filtered_nicolas_romero), 1, function(v) {
+    min(sqrt((coords_farmacias_nicolas_romero[,1] - v[1])^2 + (coords_farmacias_nicolas_romero[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_nicolas_romero$distance <- distances_filtered_nicolas_romero
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_nicolas_romero_df <- as.data.frame(st_coordinates(vertices_filtered_nicolas_romero))
+  vertices_filtered_nicolas_romero_df$distance <- vertices_filtered_nicolas_romero$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_nicolas_romero_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_nicolas_romero, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_nicolas_romero_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_nicolas_romero <- vertices_filtered_nicolas_romero_df[order(-vertices_filtered_nicolas_romero_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_nicolas_romero <- vertices_top_30_nicolas_romero[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_nicolas_romero)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_nicolas_romero, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_nicolas_romero, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/frontera_quecholac.shp")
+farmacias_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/lambert_quecholac.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_quecholac) != st_crs(farmacias_quecholac)) {
+  farmacias_quecholac <- st_transform(farmacias_quecholac, st_crs(frontera_quecholac))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_quecholac, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_quecholac, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Iztapalapa y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("quecholac_frontera_farmacias.png", width = 10, height = 8)
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/lambert_quecholac.shp")
+frontera_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/frontera_quecholac.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_quecholac <- st_coordinates(farmacias_quecholac)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_quecholac <- as.data.frame(coords_farmacias_quecholac)
+colnames(df_farmacias_quecholac) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_quecholac <- deldir(df_farmacias_quecholac$longitud, df_farmacias_quecholac$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_quecholac <- voronoi_result_quecholac$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_quecholac <- as.data.frame(segments_quecholac)
+colnames(df_segments_quecholac) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_quecholac, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_quecholac, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_quecholac, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Quecholac") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("quecholac_frontera_farmacias.png", width = 10, height = 8)
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/frontera_quecholac.shp")
+lambert_quecholac <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quecholac/lambert_quecholac.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_quecholac <- st_coordinates(lambert_quecholac)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_quecholac <- deldir(coords_farmacias_quecholac[,1], coords_farmacias_quecholac[,2])
+vertices_quecholac <- data.frame(voronoi_result_quecholac$dirsgs)
+names(vertices_quecholac) <- c("x1", "y1", "id1", "id2")
+vertices_sf_quecholac <- st_as_sf(vertices_quecholac[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_quecholac))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_quecholac), 1, function(v) {
+  min(sqrt((coords_farmacias_quecholac[,1] - v[1])^2 + (coords_farmacias_quecholac[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_quecholac$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_quecholac_df <- as.data.frame(st_coordinates(vertices_sf_quecholac))
+vertices_quecholac_df$distance <- vertices_sf_quecholac$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_quecholac_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_quecholac, fill = NA, color = "black") +
+  geom_point(data = vertices_quecholac_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("quecholac_frontera_farmacias.png", width = 10, height = 8)
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_quecholac <- vertices_sf_quecholac[st_within(vertices_sf_quecholac, frontera_quecholac, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_quecholac) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_quecholac <- apply(st_coordinates(vertices_filtered_quecholac), 1, function(v) {
+    min(sqrt((coords_farmacias_quecholac[,1] - v[1])^2 + (coords_farmacias_quecholac[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_quecholac$distance <- distances_filtered_quecholac
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_quecholac_df <- as.data.frame(st_coordinates(vertices_filtered_quecholac))
+  vertices_filtered_quecholac_df$distance <- vertices_filtered_quecholac$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_quecholac_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_quecholac, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_quecholac_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_quecholac <- vertices_filtered_quecholac_df[order(-vertices_filtered_quecholac_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_quecholac <- vertices_top_30_quecholac[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_quecholac)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_quecholac, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_quecholac, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/frontera_morelos.shp")
+farmacias_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/lambert_morelos.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_morelos) != st_crs(farmacias_morelos)) {
+  farmacias_morelos <- st_transform(farmacias_morelos, st_crs(frontera_morelos))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_morelos, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_morelos, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Morelos y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("morelos_frontera_farmacias.png", width = 10, height = 8)
+```
+
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/lambert_morelos.shp")
+frontera_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/frontera_morelos.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_morelos <- st_coordinates(farmacias_morelos)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_morelos <- as.data.frame(coords_farmacias_morelos)
+colnames(df_farmacias_morelos) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_morelos <- deldir(df_farmacias_morelos$longitud, df_farmacias_morelos$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_morelos <- voronoi_result_morelos$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_morelos <- as.data.frame(segments_morelos)
+colnames(df_segments_morelos) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_morelos, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_morelos, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_morelos, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Morelos") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("morelos_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/frontera_morelos.shp")
+lambert_morelos <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Morelos/lambert_morelos.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_morelos <- st_coordinates(lambert_morelos)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_morelos <- deldir(coords_farmacias_morelos[,1], coords_farmacias_morelos[,2])
+vertices_morelos <- data.frame(voronoi_result_morelos$dirsgs)
+names(vertices_morelos) <- c("x1", "y1", "id1", "id2")
+vertices_sf_morelos <- st_as_sf(vertices_morelos[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_morelos))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_morelos), 1, function(v) {
+  min(sqrt((coords_farmacias_morelos[,1] - v[1])^2 + (coords_farmacias_morelos[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_morelos$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_morelos_df <- as.data.frame(st_coordinates(vertices_sf_morelos))
+vertices_morelos_df$distance <- vertices_sf_morelos$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_morelos_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_morelos, fill = NA, color = "black") +
+  geom_point(data = vertices_morelos_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("morelos_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/frontera_tonatico.shp")
+farmacias_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/lambert_tonatico.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_tonatico) != st_crs(farmacias_tonatico)) {
+  farmacias_tonatico <- st_transform(farmacias_tonatico, st_crs(frontera_tonatico))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_tonatico, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_tonatico, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Tonatico y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tonatico_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/lambert_tonatico.shp")
+frontera_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/frontera_tonatico.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_tonatico <- st_coordinates(farmacias_tonatico)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_tonatico <- as.data.frame(coords_farmacias_tonatico)
+colnames(df_farmacias_tonatico) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_tonatico <- deldir(df_farmacias_tonatico$longitud, df_farmacias_tonatico$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_tonatico <- voronoi_result_tonatico$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_tonatico <- as.data.frame(segments_tonatico)
+colnames(df_segments_tonatico) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_tonatico, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_tonatico, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_tonatico, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en /Tonatico") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tonatico_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/frontera_tonatico.shp")
+lambert_tonatico <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tonatico/lambert_tonatico.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_tonatico <- st_coordinates(lambert_tonatico)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_tonatico <- deldir(coords_farmacias_tonatico[,1], coords_farmacias_tonatico[,2])
+vertices_tonatico <- data.frame(voronoi_result_tonatico$dirsgs)
+names(vertices_tonatico) <- c("x1", "y1", "id1", "id2")
+vertices_sf_tonatico <- st_as_sf(vertices_tonatico[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_tonatico))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_tonatico), 1, function(v) {
+  min(sqrt((coords_farmacias_tonatico[,1] - v[1])^2 + (coords_farmacias_tonatico[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_tonatico$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_tonatico_df <- as.data.frame(st_coordinates(vertices_sf_tonatico))
+vertices_tonatico_df$distance <- vertices_sf_tonatico$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_tonatico_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_tonatico, fill = NA, color = "black") +
+  geom_point(data = vertices_tonatico_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tonatico_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/frontera_tlatlaya.shp")
+farmacias_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/lambert_tlatlaya.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_tlatlaya) != st_crs(farmacias_tlatlaya)) {
+  farmacias_tlatlaya <- st_transform(farmacias_tlatlaya, st_crs(frontera_tlatlaya))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_tlatlaya, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_tlatlaya, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Tlatlaya y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tlatlaya_frontera_farmacias.png", width = 10, height = 8)
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/lambert_tlatlaya.shp")
+frontera_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/frontera_tlatlaya.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_tlatlaya <- st_coordinates(farmacias_tlatlaya)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_tlatlaya <- as.data.frame(coords_farmacias_tlatlaya)
+colnames(df_farmacias_tlatlaya) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_tlatlaya <- deldir(df_farmacias_tlatlaya$longitud, df_farmacias_tlatlaya$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_tlatlaya <- voronoi_result_tlatlaya$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_tlatlaya <- as.data.frame(segments_tlatlaya)
+colnames(df_segments_tlatlaya) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_tlatlaya, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_tlatlaya, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_tlatlaya, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Iztapalapa") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tlatlaya_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/frontera_tlatlaya.shp")
+lambert_tlatlaya <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tlatlaya/lambert_tlatlaya.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_tlatlaya <- st_coordinates(lambert_tlatlaya)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_tlatlaya <- deldir(coords_farmacias_tlatlaya[,1], coords_farmacias_tlatlaya[,2])
+vertices_tlatlaya <- data.frame(voronoi_result_tlatlaya$dirsgs)
+names(vertices_tlatlaya) <- c("x1", "y1", "id1", "id2")
+vertices_sf_tlatlaya <- st_as_sf(vertices_tlatlaya[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_tlatlaya))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_tlatlaya), 1, function(v) {
+  min(sqrt((coords_farmacias_tlatlaya[,1] - v[1])^2 + (coords_farmacias_tlatlaya[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_tlatlaya$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_tlatlaya_df <- as.data.frame(st_coordinates(vertices_sf_tlatlaya))
+vertices_tlatlaya_df$distance <- vertices_sf_tlatlaya$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_tlatlaya_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_tlatlaya, fill = NA, color = "black") +
+  geom_point(data = vertices_tlatlaya_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tlatlaya_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/frontera_cozumel.shp")
+farmacias_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/lambert_cozumel.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_cozumel) != st_crs(farmacias_cozumel)) {
+  farmacias_cozumel <- st_transform(farmacias_cozumel, st_crs(frontera_cozumel))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_cozumel, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_cozumel, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de cozumel y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("cozumel_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/lambert_cozumel.shp")
+frontera_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/frontera_cozumel.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_cozumel <- st_coordinates(farmacias_cozumel)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_cozumel <- as.data.frame(coords_farmacias_cozumel)
+colnames(df_farmacias_cozumel) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_cozumel <- deldir(df_farmacias_cozumel$longitud, df_farmacias_cozumel$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_cozumel <- voronoi_result_cozumel$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_cozumel <- as.data.frame(segments_cozumel)
+colnames(df_segments_cozumel) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_cozumel, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_cozumel, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_cozumel, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Cozumel") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("cozumel_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/frontera_cozumel.shp")
+lambert_cozumel <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Cozumel/lambert_cozumel.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_cozumel <- st_coordinates(lambert_cozumel)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_cozumel <- deldir(coords_farmacias_cozumel[,1], coords_farmacias_cozumel[,2])
+vertices_cozumel <- data.frame(voronoi_result_cozumel$dirsgs)
+names(vertices_cozumel) <- c("x1", "y1", "id1", "id2")
+vertices_sf_cozumel <- st_as_sf(vertices_cozumel[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_cozumel))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_cozumel), 1, function(v) {
+  min(sqrt((coords_farmacias_cozumel[,1] - v[1])^2 + (coords_farmacias_cozumel[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_cozumel$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_cozumel_df <- as.data.frame(st_coordinates(vertices_sf_cozumel))
+vertices_cozumel_df$distance <- vertices_sf_cozumel$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_cozumel_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_cozumel, fill = NA, color = "black") +
+  geom_point(data = vertices_cozumel_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("cozumel_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_cozumel <- vertices_sf_cozumel[st_within(vertices_sf_cozumel, frontera_cozumel, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_cozumel) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_cozumel <- apply(st_coordinates(vertices_filtered_cozumel), 1, function(v) {
+    min(sqrt((coords_farmacias_cozumel[,1] - v[1])^2 + (coords_farmacias_cozumel[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_cozumel$distance <- distances_filtered_cozumel
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_cozumel_df <- as.data.frame(st_coordinates(vertices_filtered_cozumel))
+  vertices_filtered_cozumel_df$distance <- vertices_filtered_cozumel$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_cozumel_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_cozumel, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_cozumel_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_cozumel <- vertices_filtered_cozumel_df[order(-vertices_filtered_cozumel_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_cozumel <- vertices_top_30_cozumel[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_cozumel)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_cozumel, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_cozumel, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+
+```
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/frontera_leon.shp")
+farmacias_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/lambert_leon.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_leon) != st_crs(farmacias_leon)) {
+  farmacias_leon <- st_transform(farmacias_leon, st_crs(frontera_leon))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_leon, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_leon, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Leon y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("leon_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/lambert_leon.shp")
+frontera_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/frontera_leon.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_leon <- st_coordinates(farmacias_leon)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_leon <- as.data.frame(coords_farmacias_leon)
+colnames(df_farmacias_leon) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_leon <- deldir(df_farmacias_leon$longitud, df_farmacias_leon$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_leon <- voronoi_result_leon$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_leon <- as.data.frame(segments_leon)
+colnames(df_segments_leon) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_leon, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_leon, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_leon, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Leon") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("leon_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/frontera_leon.shp")
+lambert_leon <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Leon/lambert_leon.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_leon <- st_coordinates(lambert_leon)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_leon <- deldir(coords_farmacias_leon[,1], coords_farmacias_leon[,2])
+vertices_leon <- data.frame(voronoi_result_leon$dirsgs)
+names(vertices_leon) <- c("x1", "y1", "id1", "id2")
+vertices_sf_leon <- st_as_sf(vertices_leon[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_leon))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_leon), 1, function(v) {
+  min(sqrt((coords_farmacias_leon[,1] - v[1])^2 + (coords_farmacias_leon[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_leon$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_leon_df <- as.data.frame(st_coordinates(vertices_sf_leon))
+vertices_leon_df$distance <- vertices_sf_leon$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_leon_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_leon, fill = NA, color = "black") +
+  geom_point(data = vertices_leon_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("leon_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_leon <- vertices_sf_leon[st_within(vertices_sf_leon, frontera_leon, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_leon) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_leon <- apply(st_coordinates(vertices_filtered_leon), 1, function(v) {
+    min(sqrt((coords_farmacias_leon[,1] - v[1])^2 + (coords_farmacias_leon[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_leon$distance <- distances_filtered_leon
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_leon_df <- as.data.frame(st_coordinates(vertices_filtered_leon))
+  vertices_filtered_leon_df$distance <- vertices_filtered_leon$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_leon_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_leon, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_leon_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_leon <- vertices_filtered_leon_df[order(-vertices_filtered_leon_df$distance), ]
+
+# Seleccionar los 20 vértices más lejanos
+vertices_top_30_leon <- vertices_top_30_leon[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_leon)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_leon, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_leon, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 20 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+
+```
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/frontera_valle.shp")
+farmacias_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/lambert_valle.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_valle) != st_crs(farmacias_valle)) {
+  farmacias_valle <- st_transform(farmacias_valle, st_crs(frontera_valle))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_valle, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_valle, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Iztapalapa y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("iztapalapa_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/lambert_valle.shp")
+frontera_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/frontera_valle.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_valle <- st_coordinates(farmacias_valle)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_valle <- as.data.frame(coords_farmacias_valle)
+colnames(df_farmacias_valle) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_valle <- deldir(df_farmacias_valle$longitud, df_farmacias_valle$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_valle <- voronoi_result_valle$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_valle <- as.data.frame(segments_valle)
+colnames(df_segments_valle) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_valle, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_valle, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_valle, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Valle de Bravo") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("valle_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/frontera_valle.shp")
+lambert_valle <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Valle/lambert_valle.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_valle <- st_coordinates(lambert_valle)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_valle <- deldir(coords_farmacias_valle[,1], coords_farmacias_valle[,2])
+vertices_valle <- data.frame(voronoi_result_valle$dirsgs)
+names(vertices_valle) <- c("x1", "y1", "id1", "id2")
+vertices_sf_valle <- st_as_sf(vertices_valle[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_valle))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_valle), 1, function(v) {
+  min(sqrt((coords_farmacias_valle[,1] - v[1])^2 + (coords_farmacias_valle[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_valle$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_valle_df <- as.data.frame(st_coordinates(vertices_sf_valle))
+vertices_valle_df$distance <- vertices_sf_valle$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_valle_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_valle, fill = NA, color = "black") +
+  geom_point(data = vertices_valle_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("valle_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_valle <- vertices_sf_valle[st_within(vertices_sf_valle, frontera_valle, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_valle) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_valle <- apply(st_coordinates(vertices_filtered_valle), 1, function(v) {
+    min(sqrt((coords_farmacias_valle[,1] - v[1])^2 + (coords_farmacias_valle[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_valle$distance <- distances_filtered_valle
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_valle_df <- as.data.frame(st_coordinates(vertices_filtered_valle))
+  vertices_filtered_valle_df$distance <- vertices_filtered_valle$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_valle_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_valle, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_valle_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_valle <- vertices_filtered_valle_df[order(-vertices_filtered_valle_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_valle <- vertices_top_30_valle[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_valle)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_valle, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_valle, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/frontera_nopaltepec.shp")
+farmacias_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/lambert_nopaltepec.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_nopaltepec) != st_crs(farmacias_nopaltepec)) {
+  farmacias_nopaltepec <- st_transform(farmacias_nopaltepec, st_crs(frontera_nopaltepec))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_nopaltepec, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_nopaltepec, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Nopaltepec y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nopaltepec_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/lambert_nopaltepec.shp")
+frontera_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/frontera_nopaltepec.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_nopaltepec <- st_coordinates(farmacias_nopaltepec)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_nopaltepec <- as.data.frame(coords_farmacias_nopaltepec)
+colnames(df_farmacias_nopaltepec) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_nopaltepec <- deldir(df_farmacias_nopaltepec$longitud, df_farmacias_nopaltepec$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_nopaltepec <- voronoi_result_nopaltepec$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_nopaltepec <- as.data.frame(segments_nopaltepec)
+colnames(df_segments_nopaltepec) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_nopaltepec, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_nopaltepec, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_nopaltepec, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Nopaltepec") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nopaltepec_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/frontera_nopaltepec.shp")
+lambert_nopaltepec <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Nopaltepec/lambert_nopaltepec.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_nopaltepec <- st_coordinates(lambert_nopaltepec)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_nopaltepec <- deldir(coords_farmacias_nopaltepec[,1], coords_farmacias_nopaltepec[,2])
+vertices_nopaltepec <- data.frame(voronoi_result_nopaltepec$dirsgs)
+names(vertices_nopaltepec) <- c("x1", "y1", "id1", "id2")
+vertices_sf_nopaltepec <- st_as_sf(vertices_nopaltepec[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_nopaltepec))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_nopaltepec), 1, function(v) {
+  min(sqrt((coords_farmacias_nopaltepec[,1] - v[1])^2 + (coords_farmacias_nopaltepec[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_nopaltepec$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_nopaltepec_df <- as.data.frame(st_coordinates(vertices_sf_nopaltepec))
+vertices_nopaltepec_df$distance <- vertices_sf_nopaltepec$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_nopaltepec_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_nopaltepec, fill = NA, color = "black") +
+  geom_point(data = vertices_nopaltepec_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("nopaltepec_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_nopaltepec <- vertices_sf_nopaltepec[st_within(vertices_sf_nopaltepec, frontera_nopaltepec, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_nopaltepec) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_nopaltepec <- apply(st_coordinates(vertices_filtered_nopaltepec), 1, function(v) {
+    min(sqrt((coords_farmacias_nopaltepec[,1] - v[1])^2 + (coords_farmacias_nopaltepec[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_nopaltepec$distance <- distances_filtered_nopaltepec
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_nopaltepec_df <- as.data.frame(st_coordinates(vertices_filtered_nopaltepec))
+  vertices_filtered_nopaltepec_df$distance <- vertices_filtered_nopaltepec$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_nopaltepec_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_nopaltepec, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_nopaltepec_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_Quiriego <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quiriego/frontera_Quiriego.shp")
+farmacias_Quiriego <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Quiriego/lambert_Quiriego.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_Quiriego) != st_crs(farmacias_Quiriego)) {
+  farmacias_Quiriego <- st_transform(farmacias_Quiriego, st_crs(frontera_Quiriego))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_Quiriego, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_Quiriego, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Quiriego y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("quiriego_frontera_farmacias.png", width = 10, height = 8)
+
+```
+
+```{r}
+# Cargar librerías necesarias
+library(sf)
+library(ggplot2)
+
+# Paso 1: Cargar los shapefiles (asegúrate de que todos los archivos relacionados están en la misma carpeta)
+frontera_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/frontera_Tejupilco.shp")
+farmacias_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/lambert_Tejupilco.shp")
+
+# Paso 2: Asegurarse de que ambos shapefiles están en el mismo sistema de referencia espacial
+if (st_crs(frontera_Tejupilco) != st_crs(farmacias_Tejupilco)) {
+  farmacias_Tejupilco <- st_transform(farmacias_Tejupilco, st_crs(frontera_Tejupilco))
+}
+
+# Paso 3: Graficar los datos
+ggplot() +
+  geom_sf(data = frontera_Tejupilco, fill = NA, color = "grey", size = 1) +  # Graficar la frontera
+  geom_sf(data = farmacias_Tejupilco, color = "deepskyblue", size = .5) +  # Graficar las farmacias
+  ggtitle("Frontera del municipio de Tejupilco y las farmacias dentro de él") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tejupilco_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar las librerías necesarias
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Paso 1: Cargar los datos
+farmacias_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/lambert_Tejupilco.shp")
+frontera_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/frontera_Tejupilco.shp")
+
+# Paso 2: Extraer las coordenadas de las farmacias
+coords_farmacias_Tejupilco <- st_coordinates(farmacias_Tejupilco)
+
+# Convertir a dataframe y renombrar las columnas
+df_farmacias_Tejupilco <- as.data.frame(coords_farmacias_Tejupilco)
+colnames(df_farmacias_Tejupilco) <- c("longitud", "latitud")
+
+# Paso 3: Calcular el diagrama de Voronoi usando las coordenadas de las farmacias
+voronoi_result_Tejupilco <- deldir(df_farmacias_Tejupilco$longitud, df_farmacias_Tejupilco$latitud)
+
+# Extraer los segmentos del Voronoi
+segments_Tejupilco <- voronoi_result_Tejupilco$dirsgs  # Asegúrate de usar voronoi_result aquí
+
+# Convertir los segmentos a un dataframe
+df_segments_Tejupilco <- as.data.frame(segments_Tejupilco)
+colnames(df_segments_Tejupilco) <- c("longitud_inicio", "latitud_inicio", "longitud_fin", "latitud_fin")
+
+# Paso 4: Graficar el diagrama de Voronoi y las farmacias
+ggplot() +
+  geom_sf(data = frontera_Tejupilco, fill = NA, color = "black") +  # Frontera del municipio
+  geom_segment(data = df_segments_Tejupilco, 
+               aes(x = longitud_inicio, y = latitud_inicio, 
+                   xend = longitud_fin, yend = latitud_fin), 
+               color = "grey") +  # Diagrama de Voronoi
+  geom_point(data = df_farmacias_Tejupilco, aes(x = longitud, y = latitud), color = "deepskyblue", size = .5) +  # Farmacias
+  ggtitle("Diagrama de Voronoi para las farmacias en Tejupilco") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tejupilco_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Cargar librerías
+library(sf)
+library(ggplot2)
+library(deldir)
+
+# Cargar los shapefiles
+frontera_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/frontera_Tejupilco.shp")
+lambert_Tejupilco <- st_read("C:/Users/Diego/OneDrive/Documents/Dataton/Tejupilco/lambert_Tejupilco.shp")
+
+# Extraer coordenadas de las farmacias
+coords_farmacias_Tejupilco <- st_coordinates(lambert_Tejupilco)
+
+# Calcular el diagrama de Voronoi
+voronoi_result_Tejupilco <- deldir(coords_farmacias_Tejupilco[,1], coords_farmacias_Tejupilco[,2])
+vertices_Tejupilco <- data.frame(voronoi_result_Tejupilco$dirsgs)
+names(vertices_Tejupilco) <- c("x1", "y1", "id1", "id2")
+vertices_sf_Tejupilco <- st_as_sf(vertices_Tejupilco[, c("x1", "y1")], coords = c("x1", "y1"), crs = st_crs(frontera_Tejupilco))
+
+# Calcular distancias a los puntos de farmacias
+distances <- apply(st_coordinates(vertices_sf_Tejupilco), 1, function(v) {
+  min(sqrt((coords_farmacias_Tejupilco[,1] - v[1])^2 + (coords_farmacias_Tejupilco[,2] - v[2])^2))
+})
+
+# Añadir las distancias al objeto de vértices
+vertices_sf_Tejupilco$distance <- distances
+
+# Convertir vertices_sf a dataframe
+vertices_Tejupilco_df <- as.data.frame(st_coordinates(vertices_sf_Tejupilco))
+vertices_Tejupilco_df$distance <- vertices_sf_Tejupilco$distance
+
+# Renombrar las columnas de las coordenadas para evitar confusiones
+colnames(vertices_Tejupilco_df) <- c("X", "Y", "distance")
+
+# Graficar el mapa de calor de las distancias a los vértices de Voronoi
+ggplot() +
+  geom_sf(data = frontera_Tejupilco, fill = NA, color = "black") +
+  geom_point(data = vertices_Tejupilco_df, 
+             aes(x = X, y = Y, color = distance), size = .3) +
+  scale_color_gradient(low = "green", high = "red") +
+  labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi",
+       color = "Distancia") +
+  theme_minimal()
+
+# (Opcional) Guardar la visualización
+ggsave("tejupilco_frontera_farmacias.png", width = 10, height = 8)
+
+```
+```{r}
+# Filtrar los vértices que están dentro de la frontera del municipio
+vertices_filtered_Tejupilco <- vertices_sf_Tejupilco[st_within(vertices_sf_Tejupilco, frontera_Tejupilco, sparse = FALSE), ]
+
+# Verificar si hay vértices dentro de la frontera
+if (nrow(vertices_filtered_Tejupilco) > 0) {
+  # Calcular distancias a los puntos de farmacias solo para los vértices filtrados
+  distances_filtered_Tejupilco <- apply(st_coordinates(vertices_filtered_Tejupilco), 1, function(v) {
+    min(sqrt((coords_farmacias_Tejupilco[,1] - v[1])^2 + (coords_farmacias_Tejupilco[,2] - v[2])^2))
+  })
+  
+  # Añadir las distancias al objeto de vértices filtrados
+  vertices_filtered_Tejupilco$distance <- distances_filtered_Tejupilco
+  
+  # Convertir vertices_filtered a dataframe
+  vertices_filtered_Tejupilco_df <- as.data.frame(st_coordinates(vertices_filtered_Tejupilco))
+  vertices_filtered_Tejupilco_df$distance <- vertices_filtered_Tejupilco$distance
+  
+  # Renombrar las columnas de las coordenadas
+  colnames(vertices_filtered_Tejupilco_df) <- c("X", "Y", "distance")
+  
+  # Graficar el mapa de calor de las distancias a los vértices de Voronoi filtrados
+  ggplot() +
+    geom_sf(data = frontera_Tejupilco, fill = NA, color = "black") +
+    geom_point(data = vertices_filtered_Tejupilco_df, 
+               aes(x = X, y = Y, color = distance), size = .4) +
+    scale_color_gradient(low = "green", high = "red") +
+    labs(title = "Mapa de Calor de Distancias a Vértices de Voronoi (Filtrados)",
+         color = "Distancia") +
+    theme_minimal()
+} else {
+  print("No hay vértices dentro de la frontera del municipio.")
+}
+```
+```{r}
+# Ordenar los vértices filtrados por la distancia en orden descendente
+vertices_top_30_Tejupilco <- vertices_filtered_Tejupilco_df[order(-vertices_filtered_Tejupilco_df$distance), ]
+
+# Seleccionar los 30 vértices más lejanos
+vertices_top_30_Tejupilco <- vertices_top_30_Tejupilco[1:30, ]
+
+# Imprimir la tabla con los 30 vértices más lejanos
+print(vertices_top_30_Tejupilco)
+
+# Graficar el mapa con los 30 vértices más lejanos
+ggplot() +
+  geom_sf(data = frontera_Tejupilco, fill = NA, color = "black") +  # Dibujar el municipio
+  geom_point(data = vertices_top_30_Tejupilco, 
+             aes(x = X, y = Y, color = distance), size = .4) +          # Graficar los 30 vértices
+  scale_color_gradient(low = "green", high = "red") +                 # Escala de color de verde a rojo
+  labs(title = "Mapa de los 30 Vértices más Lejanos de Farmacias",
+       color = "Distancia") +
+  theme_minimal()
+
+```
+
+
+
